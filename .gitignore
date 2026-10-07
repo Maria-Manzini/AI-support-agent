@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.zip
+.env
+.env.*
+.aws/
+*.pem
+*.key
+.bedrock_agentcore.yaml
+.bedrock_agentcore/
