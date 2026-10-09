@@ -444,17 +444,42 @@ async def invoke(payload, context=None):
         )
 
         # The MCP connection must remain open while the agent uses its tools.
-        with mcp_client:
-            gateway_tools = mcp_client.list_tools_sync()
-            tools.extend(gateway_tools)
+        try:
+            with mcp_client:
+                try:
+                    gateway_tools = mcp_client.list_tools_sync()
+                    tools.extend(gateway_tools)
 
-            agent = Agent(
-                model=model,
-                tools=tools,
-                hooks=[memory_hook],
-                system_prompt=SYSTEM_PROMPT,
-            )
-            response = agent(user_input)
+                    logger.info(
+                        "Gateway connected successfully. Loaded %d tools.",
+                        len(gateway_tools),
+                    )
+
+                except TimeoutError:
+                    logger.exception("Gateway tool loading timed out")
+                    return "Sorry, order and refund services are temporarily unavailable. Please try again shortly."
+
+                except ConnectionError:
+                    logger.exception("Gateway connection failed")
+                    return "Sorry, order and refund services are temporarily unavailable. Please try again shortly."
+
+                except Exception as exc:
+                    logger.exception("Gateway tool loading failed: %s", exc)
+                    return "Sorry, order and refund services are temporarily unavailable. Please try again shortly."
+
+                agent = Agent(
+                    model=model,
+                    tools=tools,
+                    hooks=[memory_hook],
+                    system_prompt=SYSTEM_PROMPT,
+                )
+                response = agent(user_input)
+
+        except Exception as exc:
+            if exc.__class__.__name__ == "MCPClientInitializationError":
+                logger.exception("Gateway connection failed during initialization")
+                return "Sorry, order and refund services are temporarily unavailable. Please try again shortly."
+            raise
 
         return response.message["content"][0]["text"]
 
